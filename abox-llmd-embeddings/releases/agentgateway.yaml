@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentgateway-system
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: agentgateway
+  namespace: flux-system
+spec:
+  interval: 1h
+  # The agentgateway project's own chart stream. kgateway-dev's v2.2.x is
+  # capped at Kubernetes 1.35 and Gateway API 1.4; abox runs 1.37 and Gateway
+  # API 1.6.2. See releases/crds/agentgateway-crds.yaml.
+  url: oci://cr.agentgateway.dev/charts/agentgateway
+  ref:
+    tag: "1.5.0"
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agentgateway
+  namespace: agentgateway-system
+spec:
+  interval: 1h
+  releaseName: agentgateway
+  dependsOn:
+    - name: agentgateway-crds
+      namespace: agentgateway-system
+  chartRef:
+    kind: OCIRepository
+    name: agentgateway
+    namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    # Required by releases/llmd.yaml -- without it an HTTPRoute backendRef to
+    # an InferencePool silently never resolves. Gates AGW_ENABLE_INFER_EXT on
+    # the controller and its RBAC on inferencepools / inferencepools/status /
+    # inferenceobjectives / endpointslices. Defaults to false.
+    inferenceExtension:
+      enabled: true
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-external
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: All

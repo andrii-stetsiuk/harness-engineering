@@ -1,0 +1,132 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG=/tmp/setup.log
+# Matches var.cluster_name in bootstrap/variables.tf.
+CLUSTER_NAME="${CLUSTER_NAME:-abox}"
+exec > >(tee -a "$LOG") 2>&1
+
+log() { echo "[$(date '+%H:%M:%S')] $*"; }
+
+log "=== k8sdiy-env setup start ==="
+
+# Detect the platform once. kind and cloud-provider-kind both publish
+# linux/darwin builds for amd64/arm64 under the same naming scheme.
+case "$(uname -s)" in
+  Linux)  PLATFORM_OS=linux ;;
+  Darwin) PLATFORM_OS=darwin ;;
+  *)      PLATFORM_OS= ;;
+esac
+case "$(uname -m)" in
+  x86_64|amd64)  PLATFORM_ARCH=amd64 ;;
+  arm64|aarch64) PLATFORM_ARCH=arm64 ;;
+  *)             PLATFORM_ARCH= ;;
+esac
+if [[ -z "${PLATFORM_OS}" || -z "${PLATFORM_ARCH}" ]]; then
+  log "Unsupported platform $(uname -s)/$(uname -m); binary installs will be skipped"
+fi
+
+# Install OpenTofu
+log "Installing OpenTofu..."
+curl -fsSL https://get.opentofu.org/install-opentofu.sh | sh -s -- --install-method standalone
+log "OpenTofu installed"
+
+# Install kind CLI. bootstrap/cluster.tf shells out to it to create the
+# cluster, so this version sets the Kubernetes version ceiling.
+if [[ -n "${PLATFORM_OS}" && -n "${PLATFORM_ARCH}" ]]; then
+  log "Installing kind..."
+  KIND_VERSION=v0.33.0
+  curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${PLATFORM_OS}-${PLATFORM_ARCH}"
+  sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+  rm -f /tmp/kind
+  log "kind installed ($(kind version))"
+else
+  log "Skipping kind install"
+fi
+
+# Install K9s
+log "Installing K9s..."
+curl -sS https://webi.sh/k9s | sh
+log "K9s installed"
+
+# Add aliases to bashrc
+cat >> ~/.bashrc <<'EOF'
+
+# k8sdiy-env aliases
+alias kk="EDITOR='code --wait' k9s"
+alias tf=tofu
+alias k=kubectl
+EOF
+
+# Repair nested-Docker egress before anything tries to pull an image. See
+# scripts/fix-egress.sh for why Codespaces needs this.
+log "Checking Docker egress..."
+bash "${SCRIPT_DIR}/fix-egress.sh"
+
+# Clear the default ACL Codespaces leaves on Docker's data-root before the nodes
+# unpack any layer under it. See scripts/fix-docker-acl.sh.
+log "Checking Docker layer permissions..."
+bash "${SCRIPT_DIR}/fix-docker-acl.sh"
+
+# Initialize Tofu
+log "Running tofu init..."
+cd bootstrap
+tofu init
+log "tofu init done"
+
+# A Codespace restart wipes Docker's data-root -- it lives under /tmp -- and
+# takes the kind cluster with it, while the OpenTofu state still describes one.
+# The three Kubernetes providers are configured from terraform_data.cluster.output,
+# so the first refresh dials an API server that is gone and the plan dies before
+# it can rebuild anything:
+#
+#   Error: Get "https://127.0.0.1:33713/api/v1/namespaces/flux-operator-bootstrap":
+#   dial tcp 127.0.0.1:33713: connect: connection refused
+#
+# If state names a cluster kind no longer has, the state is describing something
+# that does not exist. Drop it and let the apply build from nothing; there is
+# nothing to orphan.
+# command -v kind first: without it "kind get clusters" fails and every cluster
+# looks absent, which would prune the state of a perfectly healthy one.
+if command -v kind >/dev/null 2>&1 \
+   && tofu state list >/dev/null 2>&1 \
+   && tofu state list 2>/dev/null | grep -qx 'terraform_data.cluster' \
+   && ! kind get clusters 2>/dev/null | grep -qxF "${CLUSTER_NAME}"; then
+  log "state describes cluster '${CLUSTER_NAME}', kind has no such cluster -- pruning stale state"
+  for addr in $(tofu state list 2>/dev/null); do
+    tofu state rm "${addr}" >/dev/null 2>&1 || log "could not remove ${addr} from state"
+  done
+  log "stale state pruned"
+fi
+
+log "Running tofu apply..."
+tofu apply -auto-approve
+log "tofu apply done"
+
+# The bootstrap Job and every Flux-managed image are pulled by kubelet on the
+# kind nodes, so confirm the nodes can actually reach a registry.
+bash "${SCRIPT_DIR}/fix-egress.sh" verify "${CLUSTER_NAME}" \
+  || log "WARNING: nodes cannot reach a registry, Flux will not reconcile"
+bash "${SCRIPT_DIR}/fix-docker-acl.sh" verify "${CLUSTER_NAME}" \
+  || log "WARNING: non-root images will fail at exec on this cluster"
+
+export KUBECONFIG=~/.kube/config
+
+cd ..
+
+# Install cloud-provider-kind (LoadBalancer support)
+if [[ -n "${PLATFORM_OS}" && -n "${PLATFORM_ARCH}" ]]; then
+  log "Installing cloud-provider-kind..."
+  CPK_VERSION=0.11.1
+  CPK_URL="https://github.com/kubernetes-sigs/cloud-provider-kind/releases/download/v${CPK_VERSION}/cloud-provider-kind_${CPK_VERSION}_${PLATFORM_OS}_${PLATFORM_ARCH}.tar.gz"
+  curl -fsSL "$CPK_URL" -o /tmp/cloud-provider-kind.tar.gz
+  tar -xzf /tmp/cloud-provider-kind.tar.gz -C /tmp cloud-provider-kind
+  rm -f /tmp/cloud-provider-kind.tar.gz
+  nohup /tmp/cloud-provider-kind > /tmp/cloud-provider-kind.log 2>&1 &
+  log "cloud-provider-kind started (pid $!)"
+else
+  log "Skipping cloud-provider-kind install"
+fi
+
+log "=== setup complete ==="
