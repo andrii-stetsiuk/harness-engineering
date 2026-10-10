@@ -43,14 +43,21 @@ make run  →  scripts/setup.sh
   → tofu apply (bootstrap/)
       → KinD cluster
       → Flux Operator + FluxInstance   via the upstream flux-operator-bootstrap module
-      → ResourceSetInputProvider   polls oci://ghcr.io/den-vasyliev/abox/releases
+      → ResourceSetInputProvider   polls the branch-specific GHCR OCI artifact
       → ResourceSet                creates OCIRepository + 2 Kustomizations
           → releases/crds/    gateway-api-crds, agentgateway-crds, kagent-crds
           → releases/         agentgateway (Gateway + GatewayClass)
                               kagent (agent runtime + HTTPRoute)
 ```
 
-Everything after the cluster is **gitless GitOps via OCI**: no Git polling, no deploy keys. CI publishes `releases/` as an OCI artifact on every version tag. The cluster reconciles from that artifact automatically.
+Everything after the cluster is **gitless GitOps via OCI**: no Git polling, no deploy keys. The root GitHub Actions workflow publishes `abox-llmd-embeddings/releases/` as an OCI artifact on every version tag. The cluster reconciles from that branch's artifact automatically.
+
+`make run` bootstraps Flux to follow the branch-specific OCI artifact configured
+by `bootstrap/variables.tf`; it does not apply the local `releases/` directory
+directly. Publish a new release with `make push` before expecting local manifest
+changes to appear in the cluster. Feature-branch artifact names must match the
+suffix derived by the root `.github/workflows/flux-push.yaml` workflow. The
+artifact package must be public for Flux to pull it without registry credentials.
 
 ## Releasing
 
@@ -70,7 +77,7 @@ make push   # bumps patch version, tags, pushes → CI publishes OCI artifact �
 | `releases/` | App HelmReleases + Gateway + HTTPRoutes |
 | `images/nomic-embed/` | Dockerfile baking nomic-embed-text-v1.5 into llama.cpp server |
 | `scripts/setup.sh` | Full setup script (`make run`) |
-| `.github/workflows/flux-push.yaml` | CI: publish `releases/` as OCI artifact on `v*` tags |
+| `../.github/workflows/flux-push.yaml` | CI: publish `releases/` as OCI artifact on `v*` tags |
 
 ## Embeddings: two backends
 

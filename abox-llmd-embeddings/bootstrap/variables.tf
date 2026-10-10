@@ -19,7 +19,7 @@ variable "kubeconfig_path" {
 variable "oci_registry" {
   description = "OCI registry base URL"
   type        = string
-  default     = "oci://ghcr.io/den-vasyliev/abox"
+  default     = "oci://ghcr.io/andrii-stetsiuk/harness-engineering"
 }
 
 variable "releases_artifact" {
@@ -28,10 +28,10 @@ variable "releases_artifact" {
   # main publishes to "releases". Every v* tag cut from a feature branch would
   # land in that same stream -- the RSIP filter is ^\d+\.\d+\.\d+$ with
   # limit 1, so the newest tag from any branch would win and a cluster
-  # bootstrapped from main would get this branch's bundle. feat/llmd-embeddings
+  # bootstrapped from main would get this branch's bundle. feat/lab-4
   # therefore has its own repository, matching the name
   # .github/workflows/flux-push.yaml derives from the branch.
-  default = "releases-llmd-embeddings"
+  default = "releases-lab-4"
 }
 
 variable "releases_version" {

@@ -45,5 +45,5 @@ push:
 	$(eval PATCH=$(shell echo $(TAG) | cut -d. -f3))
 	$(eval NEW_TAG=v$(MAJOR).$(MINOR).$(shell echo $$(($(PATCH)+1))))
 	@git tag $(NEW_TAG)
-	@git push origin main $(NEW_TAG)
+	@git push origin HEAD $(NEW_TAG)
 	@echo "Tagged and pushed $(NEW_TAG)"

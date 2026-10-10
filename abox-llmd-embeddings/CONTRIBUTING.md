@@ -48,7 +48,7 @@ and set `debug_on_failure = true` on the module to relay the Job logs into the a
 
 ### Changing the release pipeline
 
-The CI workflow is at `.github/workflows/flux-push.yaml`. The RSIP filter (`^\d+\.\d+\.\d+$`) and `make push` version bumping logic must stay in sync.
+The CI workflow is at `../.github/workflows/flux-push.yaml` in this workspace. The RSIP filter (`^\d+\.\d+\.\d+$`) and `make push` version bumping logic must stay in sync.
 
 ## Pull request guidelines
 

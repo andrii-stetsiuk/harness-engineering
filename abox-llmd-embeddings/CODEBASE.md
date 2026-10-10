@@ -39,7 +39,7 @@ KinD cluster
   → module: flux-operator-bootstrap (bootstrap/, upstream controlplaneio-fluxcd module)
       → in-cluster Job: helm install flux-operator
       → apply FluxInstance (create-if-missing), wait for Ready
-  → kubectl_manifest: RSIP          (polls ghcr.io/.../releases for semver tags)
+  → kubectl_manifest: RSIP          (polls the branch-specific GHCR OCI artifact for semver tags)
   → kubectl_manifest: ResourceSet   (creates OCIRepository + 2 Kustomizations)
 ```
 
@@ -83,9 +83,9 @@ releases/
   kustomization.yaml
 scripts/
   setup.sh           Called by make run
-.github/
+../.github/
   workflows/
-    flux-push.yaml   Publishes releases/ as OCI artifact on v* tags
+    flux-push.yaml   Publishes abox-llmd-embeddings/releases/ as OCI artifact on v* tags
 ```
 
 ### Component roles
@@ -117,7 +117,10 @@ scripts/
 
 ### Releasing
 
-`make push` bumps the patch version and pushes. The RSIP picks up the new tag within 5 minutes (poll interval).
+`make push` bumps the patch version and pushes the current branch and tag. The
+root GitHub Actions workflow publishes the branch's `releases/` bundle to GHCR.
+The RSIP picks up the new tag within 5 minutes (poll interval); the artifact
+package must be public unless Flux is configured with registry credentials.
 
 ---
 
