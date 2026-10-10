@@ -75,3 +75,37 @@ spec:
       limits:
         cpu: 500m
         memory: 256Mi
+---
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: qdrant-official-mcp
+  namespace: kagent
+spec:
+  transportType: stdio
+  stdioTransport: {}
+  deployment:
+    # Official upstream Qdrant MCP server from
+    # https://github.com/qdrant/mcp-server-qdrant. It keeps the same Qdrant
+    # cluster, but uses the upstream Python package and FastEmbed-based memory
+    # tools instead of the custom Go variant that was added earlier.
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm
+    cmd: /bin/sh
+    args:
+      - -c
+      - |
+        uvx --quiet mcp-server-qdrant \
+          --qdrant-url "$QDRANT_URL" \
+          --collection-name "$COLLECTION_NAME" \
+          --embedding-model "$EMBEDDING_MODEL"
+    env:
+      QDRANT_URL: http://qdrant.qdrant:6333
+      COLLECTION_NAME: abox-official-memory
+      EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi

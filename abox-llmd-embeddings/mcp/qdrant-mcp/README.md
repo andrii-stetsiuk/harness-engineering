@@ -3,12 +3,12 @@
 MCP tools over a Qdrant collection, embedding through any OpenAI-compatible
 `/v1/embeddings` endpoint.
 
-Replaces [`mcp-server-qdrant`](https://github.com/qdrant/mcp-server-qdrant),
-whose `EmbeddingProviderType` enum has exactly one member, `FASTEMBED`, so it
-always runs onnxruntime inside its own pod. Loading the f32 nomic ONNX put that
-over a 2Gi limit and it was OOMKilled repeatedly. This server sends the text to
-an endpoint instead, so the vectors it writes land in the same space the rest of
-the cluster serves.
+This project stays as the cluster's `vector_store`/`vector_find` implementation,
+while the upstream [`mcp-server-qdrant`](https://github.com/qdrant/mcp-server-qdrant)
+was also added in `releases/mcp-servers.yaml` as `qdrant-official-mcp` for the
+memory-oriented toolset. The custom Go server still exists because it writes
+vectors into the same embedding space the cluster serves, which is what the
+retrieval agent expects.
 
 ## Tools
 
