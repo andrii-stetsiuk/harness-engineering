@@ -7,10 +7,8 @@ spec:
   type: Declarative
   description: Ingests and retrieves data across a vector store and a graph.
   declarative:
-    # The ModelConfig the kagent chart creates, which every other agent here
-    # uses. It was gemini-gemini-2-5-flash, but that object was never shipped
-    # in releases/ -- it was created by hand and did not survive the cluster
-    # being rebuilt, leaving the agent stuck on ReconcileFailed.
+    # The kagent chart creates this shared ModelConfig from providers.openAI
+    # in releases/kagent.yaml. The chart-provided k8s-agent uses it as well.
     modelConfig: default-model-config
     stream: true
     systemMessage: |

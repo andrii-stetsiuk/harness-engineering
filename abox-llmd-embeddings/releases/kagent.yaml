@@ -87,6 +87,9 @@ spec:
     providers:
       default: openAI
       openAI:
+        # Both retrieval-agent and the chart-provided k8s-agent use the
+        # generated default-model-config.
+        model: gpt-4.1-mini
         apiKey: OPENAI_API_KEY
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1

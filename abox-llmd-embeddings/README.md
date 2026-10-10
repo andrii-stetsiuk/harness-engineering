@@ -11,6 +11,7 @@
 | **agentgateway v2.2.1** | AI-aware API gateway (Gateway API–native, MCP-aware) |
 | **kagent 0.10.1** | Kubernetes-native AI agent framework |
 | **Qdrant 1.19.1** | Vector database for retrieval |
+| **Qdrant MCP servers** | Custom embedding-aware tools and the official upstream memory server |
 | **Neo4j 2026.7.1** | Graph database (`bolt://neo4j.neo4j:7687`) |
 | **llm-d v0.3.17** | Distributed inference serving — llama.cpp + InferencePool/EPP, serving `nomic-embed-text-v1.5` |
 | **llama.cpp** | Second, lightweight embeddings backend — same model as f16 GGUF |
@@ -177,6 +178,55 @@ requests/limits if you run somewhere with real headroom.
 3. Run `make push` — the cluster reconciles automatically.
 
 The CRD kustomization runs first (`wait: true`), apps run after (`dependsOn: releases-crds`). This ordering is enforced by Flux and must be preserved.
+
+### Qdrant MCP servers
+
+`releases/mcp-servers.yaml` deploys two MCP servers in the `kagent` namespace:
+
+| MCPServer | Implementation | Tools / collection |
+|---|---|---|
+| `qdrant-mcp` | Project's Go server; embeds through the cluster's llama.cpp endpoint | `vector_store`, `vector_find` / `abox-nomic` |
+| `qdrant-official-mcp` | Official [Qdrant MCP server](https://github.com/qdrant/mcp-server-qdrant), launched with `uvx` | `qdrant-store-memory`, `qdrant-find-memories` / `abox-official-memory` |
+
+The official server uses `sentence-transformers/all-MiniLM-L6-v2` through its
+FastEmbed provider. It writes to the same Qdrant service, but its collection is
+separate from `abox-nomic`; do not mix the two embedding spaces. It runs as an
+MCP service, not a web app with its own UI. Check its status and logs with:
+
+```bash
+kubectl get mcpserver qdrant-official-mcp -n kagent
+kubectl get pods,svc -n kagent | grep qdrant-official-mcp
+kubectl logs -n kagent deploy/qdrant-official-mcp --tail=100
+```
+
+The Qdrant database dashboard is separate from the MCP server:
+
+```bash
+kubectl port-forward -n qdrant svc/qdrant 6333:6333
+```
+
+Then open http://localhost:6333/dashboard.
+
+### Agent model
+
+The kagent chart generates `default-model-config` from the provider settings
+in `releases/kagent.yaml`. Both `retrieval-agent` and the chart-provided
+`k8s-agent` use this shared config, which pins the OpenAI model to
+`gpt-4.1-mini`. The API key is read from the `kagent-openai` Kubernetes Secret;
+do not commit the key in the release manifests. Check the deployed model and
+agent references with:
+
+```bash
+kubectl get modelconfig default-model-config -n kagent \
+  -o jsonpath='{.spec.provider}{" / "}{.spec.model}{"\n"}'
+kubectl get agents retrieval-agent k8s-agent -n kagent \
+  -o custom-columns=NAME:.metadata.name,MODEL:.spec.declarative.modelConfig
+```
+
+The retrieval agent currently uses the custom `qdrant-mcp` tools
+(`vector_store` and `vector_find`), not `qdrant-official-mcp`. The official
+server is deployed independently and can be exposed to an agent by adding its
+`MCPServer` reference and the desired tool names to that agent's manifest.
 
 ## Contributing
 
