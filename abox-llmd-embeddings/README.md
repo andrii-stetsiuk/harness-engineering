@@ -193,7 +193,14 @@ The CRD kustomization runs first (`wait: true`), apps run after (`dependsOn: rel
 | MCPServer | Implementation | Tools / collection |
 |---|---|---|
 | `qdrant-mcp` | Project's Go server; embeds through the cluster's llama.cpp endpoint | `vector_store`, `vector_find` / `abox-nomic` |
-| `qdrant-official-mcp` | Official [Qdrant MCP server](https://github.com/qdrant/mcp-server-qdrant), launched with `uvx` | `qdrant-store-memory`, `qdrant-find-memories` / `abox-official-memory` |
+| `qdrant-official-mcp` | Official [Qdrant MCP server](https://github.com/qdrant/mcp-server-qdrant), launched with `uvx` and MiniLM via FastEmbed | `qdrant-store`, `qdrant-find` / `abox-official-memory` |
+
+A controlled 10-query retrieval comparison over the same 14 manifests found
+Recall@5 of 100% for both collections and MRR@5 of 0.950 for the project
+Nomic MCP versus 0.858 for the official MiniLM MCP. This is a small,
+tool-level benchmark, not a full agent evaluation; see
+[ADR-0001](./docs/adr/0001-agentic-retrieval-qdrant-embeddings.md) for the
+queries, ranks, methodology, and limitations.
 
 The `retrieval-agent` uses the default project `qdrant-mcp` tools
 (`vector_store` and `vector_find`) to index and search user-approved content,
