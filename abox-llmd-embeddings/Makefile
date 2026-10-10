@@ -39,11 +39,16 @@ down:
 
 push:
 	@git fetch origin --tags --force
-	$(eval TAG=$(shell git tag --list 'v*' | sort -V | tail -1 | sed 's/^v//' || echo "0.0.0"))
-	$(eval MAJOR=$(shell echo $(TAG) | cut -d. -f1))
-	$(eval MINOR=$(shell echo $(TAG) | cut -d. -f2))
-	$(eval PATCH=$(shell echo $(TAG) | cut -d. -f3))
-	$(eval NEW_TAG=v$(MAJOR).$(MINOR).$(shell echo $$(($(PATCH)+1))))
-	@git tag $(NEW_TAG)
-	@git push origin HEAD $(NEW_TAG)
-	@echo "Tagged and pushed $(NEW_TAG)"
+	@set -eu; \
+	  latest_tag=$$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n 1 || true); \
+	  if [ -z "$$latest_tag" ]; then latest_tag=v0.0.0; fi; \
+	  version=$${latest_tag#v}; \
+	  major=$${version%%.*}; \
+	  remainder=$${version#*.}; \
+	  minor=$${remainder%%.*}; \
+	  patch=$${remainder#*.}; \
+	  new_tag="v$$major.$$minor.$$((patch + 1))"; \
+	  branch=$$(git branch --show-current); \
+	  if [ -z "$$branch" ]; then echo "Cannot publish from detached HEAD" >&2; exit 1; fi; \
+	  git push origin "HEAD:refs/heads/$$branch" "HEAD:refs/tags/$$new_tag"; \
+	  echo "Pushed branch $$branch and tag $$new_tag"
