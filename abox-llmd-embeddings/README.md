@@ -195,10 +195,14 @@ The CRD kustomization runs first (`wait: true`), apps run after (`dependsOn: rel
 | `qdrant-mcp` | Project's Go server; embeds through the cluster's llama.cpp endpoint | `vector_store`, `vector_find` / `abox-nomic` |
 | `qdrant-official-mcp` | Official [Qdrant MCP server](https://github.com/qdrant/mcp-server-qdrant), launched with `uvx` | `qdrant-store-memory`, `qdrant-find-memories` / `abox-official-memory` |
 
-The official server uses `sentence-transformers/all-MiniLM-L6-v2` through its
-FastEmbed provider. It writes to the same Qdrant service, but its collection is
-separate from `abox-nomic`; do not mix the two embedding spaces. It runs as an
-MCP service, not a web app with its own UI. Check its status and logs with:
+The `retrieval-agent` exposes both official tools. It uses
+`qdrant-store-memory` and `qdrant-find-memories` only for explicit user memories;
+manifest ingestion and retrieval continue to use the custom server's
+`vector_store` and `vector_find` tools. The official server uses
+`sentence-transformers/all-MiniLM-L6-v2` through its FastEmbed provider. It
+writes to the same Qdrant service, but its collection is separate from
+`abox-nomic`; do not mix the two embedding spaces. It runs as an MCP service,
+not a web app with its own UI. Check its status and logs with:
 
 ```bash
 kubectl get mcpserver qdrant-official-mcp -n kagent
@@ -230,10 +234,9 @@ kubectl get agents retrieval-agent k8s-agent -n kagent \
   -o custom-columns=NAME:.metadata.name,MODEL:.spec.declarative.modelConfig
 ```
 
-The retrieval agent currently uses the custom `qdrant-mcp` tools
-(`vector_store` and `vector_find`), not `qdrant-official-mcp`. The official
-server is deployed independently and can be exposed to an agent by adding its
-`MCPServer` reference and the desired tool names to that agent's manifest.
+`retrieval-agent` exposes both Qdrant MCP servers. The official memory tools
+operate on a different collection/embedding space from the custom tools, so
+use the appropriate tool pair for the data being stored or retrieved.
 
 ## Contributing
 
