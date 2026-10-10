@@ -195,17 +195,13 @@ The CRD kustomization runs first (`wait: true`), apps run after (`dependsOn: rel
 | `qdrant-mcp` | Project's Go server; embeds through the cluster's llama.cpp endpoint | `vector_store`, `vector_find` / `abox-nomic` |
 | `qdrant-official-mcp` | Official [Qdrant MCP server](https://github.com/qdrant/mcp-server-qdrant), launched with `uvx` | `qdrant-store-memory`, `qdrant-find-memories` / `abox-official-memory` |
 
-The `retrieval-agent` uses the official tools as the default index for any new
-content the user asks it to store, including documents and Kubernetes
-manifests. `qdrant-store-memory` indexes content with
-`sentence-transformers/all-MiniLM-L6-v2`; `qdrant-find-memories` searches it.
-The upstream MCP accepts content as text and does not expose metadata
-arguments, so the agent includes source identifiers such as filename or
-Kubernetes kind and namespace/name in the indexed text. The legacy custom
-server's `vector_store` and `vector_find` remain available for the old
-`abox-nomic` collection only. That collection uses a different embedding space;
-do not mix or cross-search the collections. The official MCP runs as a service,
-not a web app with its own UI. Check its status and logs with:
+The `retrieval-agent` uses the default project `qdrant-mcp` tools
+(`vector_store` and `vector_find`) to index and search user-approved content,
+including documents and Kubernetes manifests. It writes to `abox-nomic` and
+embeds through the cluster's configured llama.cpp endpoint. The official MCP
+is deployed separately but is not in this agent's toolset. Its collection uses
+a different embedding model and must not be mixed or cross-searched with
+`abox-nomic`. Check the official server's status and logs with:
 
 ```bash
 kubectl get mcpserver qdrant-official-mcp -n kagent
@@ -237,9 +233,8 @@ kubectl get agents retrieval-agent k8s-agent -n kagent \
   -o custom-columns=NAME:.metadata.name,MODEL:.spec.declarative.modelConfig
 ```
 
-`retrieval-agent` exposes both Qdrant MCP servers. Use the official tools for
-newly indexed content and the custom tools only for content already stored in
-the legacy collection.
+`retrieval-agent` uses only the project's default `qdrant-mcp` for vector
+indexing and search.
 
 ## Contributing
 
